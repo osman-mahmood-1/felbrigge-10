@@ -981,7 +981,7 @@ function AppInner(){
 
   const CAT_ORDER=["Preliminaries","Loft Dormer","Rear Extension","Partition Walls","Plumbing & Heating","Electrical","Bathrooms","Kitchen","Fire Doors","Plastering & Decorating","Flooring","Fit-Out"];
 
-  const CalendarPanel=(()=>{
+  const CalendarPanel=()=>{
     if(!openPicker)return null;
     const id=openPicker.id;
     const saved=taskDates[id]||DEFAULT_TASK_DATES[id];
@@ -1101,7 +1101,7 @@ function AppInner(){
         </div>
       </>
     );
-  })();
+  };
 
   // ── Overview sections
 
@@ -1118,7 +1118,7 @@ function AppInner(){
       <div style={{position:"relative",zIndex:1}}>
 
       {/* Calendar picker rendered at root to escape card overflow:hidden */}
-      {CalendarPanel}
+      {openPicker&&<CalendarPanel/>}
 
       <style>{`
         html,body,#root{margin:0;padding:0;width:100%;}
