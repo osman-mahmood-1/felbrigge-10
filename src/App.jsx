@@ -1,4 +1,40 @@
 import { useState, useMemo, useEffect, useRef, Component } from "react";
+// ─── SUPABASE SHARED STATE ───────────────────────────────────────────────────
+const SB_URL = "https://ulkcbnevgyaqdwwmlpae.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVsa2NibmV2Z3lhcWR3d21scGFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2ODExMTEsImV4cCI6MjA5MDI1NzExMX0.bn29ImVU4JOnKHQ91keA0WQANYJc7x-ncUEc3psG_sM";
+
+const sbFetch = async (key) => {
+  const r = await fetch(`${SB_URL}/rest/v1/shared_state?key=eq.${key}&select=value`, {
+    headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}
+  });
+  const d = await r.json();
+  return d[0]?.value ?? null;
+};
+
+const sbSet = async (key, value) => {
+  await fetch(`${SB_URL}/rest/v1/shared_state?key=eq.${key}`, {
+    method:"PATCH",
+    headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+    body: JSON.stringify({value, updated_at: new Date().toISOString()})
+  });
+};
+
+const sbSubscribe = (onChange) => {
+  const ws = new WebSocket(
+    `wss://ulkcbnevgyaqdwwmlpae.supabase.co/realtime/v1/websocket?apikey=${SB_KEY}&vsn=1.0.0`
+  );
+  ws.onopen = () => {
+    ws.send(JSON.stringify({topic:"realtime:public:shared_state",event:"phx_join",payload:{},ref:1}));
+  };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if(msg.event==="postgres_changes"||msg.payload?.data?.type==="UPDATE") {
+      onChange(msg.payload?.data?.record);
+    }
+  };
+  return ()=>ws.close();
+};
+
 
 // ─── ERROR BOUNDARY ──────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -686,13 +722,20 @@ function AppInner(){
     meta.content=color;
   },[dark]);
 
-  // ── localStorage persistence ──────────────────────────────────────────────
-  const LS = "fbr10_v1"; // bump suffix to clear saved data after breaking schema changes
+  // ── Supabase shared state ─────────────────────────────────────────────────
+  const LS = "fbr10_v1"; // localStorage fallback key prefix
   const lsGet = (key, fallback) => {
     try { const v=localStorage.getItem(LS+"_"+key); return v?JSON.parse(v):fallback; } catch{ return fallback; }
   };
   const lsSet = (key, val) => {
     try { localStorage.setItem(LS+"_"+key, JSON.stringify(val)); } catch{}
+  };
+  // Sync to Supabase (debounced 800ms to avoid hammering on drag)
+  const sbSyncTimer = useRef({});
+  const syncToSB = (key, val) => {
+    lsSet(key, val); // always save locally too
+    clearTimeout(sbSyncTimer.current[key]);
+    sbSyncTimer.current[key] = setTimeout(()=>sbSet(key, val), 800);
   };
 
   const [tab,setTab]=useState("overview");
@@ -738,13 +781,31 @@ function AppInner(){
   const [contacts,setContacts]=useState(()=>lsGet("contacts",INIT_CONTACTS));
   const [editContact,setEditContact]=useState(null);
 
-  // Persist all user-editable state to localStorage whenever it changes
-  useEffect(()=>lsSet("materials",materials),[materials]);
-  useEffect(()=>lsSet("labour",labour),[labour]);
-  useEffect(()=>lsSet("fees",fees),[fees]);
-  useEffect(()=>lsSet("contacts",contacts),[contacts]);
-  useEffect(()=>lsSet("taskDates",taskDates),[taskDates]);
-  useEffect(()=>lsSet("taskStatuses",taskStatuses),[taskStatuses]);
+  // Persist to Supabase (shared) + localStorage (local fallback)
+  useEffect(()=>syncToSB("materials",materials),[materials]);
+  useEffect(()=>syncToSB("labour",labour),[labour]);
+  useEffect(()=>syncToSB("fees",fees),[fees]);
+  useEffect(()=>syncToSB("contacts",contacts),[contacts]);
+  useEffect(()=>syncToSB("taskDates",taskDates),[taskDates]);
+  useEffect(()=>syncToSB("taskStatuses",taskStatuses),[taskStatuses]);
+  useEffect(()=>syncToSB("taskDeps",Object.fromEntries(GRAPH_TASKS_INIT.map(t=>[t.id,taskDeps[t.id]||[]]))),[taskDeps]);
+
+  // Load initial state from Supabase on mount
+  useEffect(()=>{
+    const keys=["materials","labour","fees","contacts","taskDates","taskStatuses","taskDeps"];
+    Promise.all(keys.map(k=>sbFetch(k).then(v=>[k,v]))).then(pairs=>{
+      pairs.forEach(([k,v])=>{
+        if(!v||!Object.keys(v).length&&!Array.isArray(v)) return;
+        if(k==="materials"&&Array.isArray(v)&&v.length) setMaterials(v);
+        if(k==="labour"&&Array.isArray(v)&&v.length) setLabour(v);
+        if(k==="fees"&&Array.isArray(v)&&v.length) setFees(v);
+        if(k==="contacts"&&Array.isArray(v)&&v.length) setContacts(v);
+        if(k==="taskDates"&&v&&Object.keys(v).length) setTaskDates(v);
+        if(k==="taskStatuses"&&v&&Object.keys(v).length) setTaskStatuses(p=>({...p,...v}));
+        if(k==="taskDeps"&&v&&Object.keys(v).length) setTaskDeps(p=>({...p,...v}));
+      });
+    }).catch(()=>{});
+  },[]);
 
   // Export all data as a JSON snapshot
   const exportData=()=>{
