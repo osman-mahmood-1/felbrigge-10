@@ -899,6 +899,8 @@ function AppInner(){
     }return result;
   };
   // Format week offset as date label e.g. "W3 · 6 Apr"
+  const TOTAL_WEEKS=52;
+  const PROJECT_START=new Date(2026,2,23);
   const PROJECT_START_MS=new Date(2026,2,23).getTime();
   const fmtWk=(wk)=>{
     const d=new Date(PROJECT_START_MS+wk*7*86400000);
@@ -970,8 +972,6 @@ function AppInner(){
     );
   };
 
-  const TOTAL_WEEKS=52;
-  const PROJECT_START=new Date(2026,2,23);
 
   // Calendar panel rendered at root level to escape card overflow:hidden
   const CalendarPanel=(()=>{
