@@ -974,6 +974,13 @@ function AppInner(){
 
 
   // Calendar panel rendered at root level to escape card overflow:hidden
+  const PHASE_COLORS={"Planning & Approvals":"#007AFF","Loft Works":"#FF9500","Internal First Fix":"#5AC8FA","Rear Extension":"#FF9500","Second Fix & Fit-Out":"#5856D6","Handover":"#34C759"};
+  const monthLabels=()=>{const ms=[];let last=-1;for(let w=0;w<TOTAL_WEEKS;w++){const d=new Date(PROJECT_START.getTime()+w*7*86400000);const m=d.getMonth();if(m!==last){ms.push({week:w,label:d.toLocaleDateString("en-GB",{month:"short",year:"2-digit"})});last=m;}else ms.push(null);}return ms;};
+  const mLabels=monthLabels();
+  const COL_W=28;const LABEL_W=130;
+
+  const CAT_ORDER=["Preliminaries","Loft Dormer","Rear Extension","Partition Walls","Plumbing & Heating","Electrical","Bathrooms","Kitchen","Fire Doors","Plastering & Decorating","Flooring","Fit-Out"];
+
   const CalendarPanel=(()=>{
     if(!openPicker)return null;
     const id=openPicker.id;
@@ -1098,12 +1105,6 @@ function AppInner(){
 
   // ── Overview sections
 
-  const PHASE_COLORS={"Planning & Approvals":"#007AFF","Loft Works":"#FF9500","Internal First Fix":"#5AC8FA","Rear Extension":"#FF9500","Second Fix & Fit-Out":"#5856D6","Handover":"#34C759"};
-  const monthLabels=()=>{const ms=[];let last=-1;for(let w=0;w<TOTAL_WEEKS;w++){const d=new Date(PROJECT_START.getTime()+w*7*86400000);const m=d.getMonth();if(m!==last){ms.push({week:w,label:d.toLocaleDateString("en-GB",{month:"short",year:"2-digit"})});last=m;}else ms.push(null);}return ms;};
-  const mLabels=monthLabels();
-  const COL_W=28;const LABEL_W=130;
-
-  const CAT_ORDER=["Preliminaries","Loft Dormer","Rear Extension","Partition Walls","Plumbing & Heating","Electrical","Bathrooms","Kitchen","Fire Doors","Plastering & Decorating","Flooring","Fit-Out"];
 
   return(
     <div style={{minHeight:"100vh",fontFamily:FONT,color:T.text,transition:"background .5s ease,color .3s ease",position:"relative"}}>
